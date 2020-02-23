@@ -4,6 +4,10 @@ import functions
 import random
 import base64
 from random import randint
+import json
+import ast
+import hashlib
+from Crypto.Util.Padding import pad, unpad
 
 
 def config():
@@ -23,7 +27,6 @@ def on_new_client(client, connection):
     print(f"S-a conectat un nou client cu adresa ip {ip}, si portul: {port}!")
 
     msg = client.recv(1024)
-    print(f"Mesajul de la client: {msg}")
     pub_k_c_encrypted = msg
     pub_k_c = functions.decrypt_asymmetric(pub_k_c_encrypted, "Merchant")
     # mesajul 2
@@ -34,9 +37,36 @@ def on_new_client(client, connection):
     message2_encrypted = functions.encrypt_symmetric(message2, pub_k_c)
     client.sendall(message2_encrypted)
 
-    msg = client.recv(1024)
+    msg = client.recv(3072)
     print("Pregatim mesajul 4 sa-l trimitem\n")
-
+    msg2_decrypted = functions.decrypt_asymmetric(msg, "Merchant").decode("utf8")
+    json_data = ast.literal_eval(msg2_decrypted)
+    po = json_data['PO']
+    oi = po['OI']
+    json_oi = ast.literal_eval(oi)
+    amount = json_oi['Amount']
+    oi = str(oi)
+    oi_signature = po['OI_signature']
+    oi_hash = hashlib.md5(oi.encode("utf8")).hexdigest()
+    oi_signature_decrypted = unpad(functions.decrypt_symmetric(oi_signature, pub_k_c), 24).decode("utf8")
+    if oi_hash == oi_signature_decrypted:
+        print("Semnatura clientului asupra lui OI este in regula")
+    else:
+        client.sendall(b"ABORT")
+    PM = json_data['PM']
+    sid_pubkc_amount = {"sid": sid, "pubkc": pub_k_c, "amount": amount}
+    signature_sid_pubkc_amount = functions.sign("Merchant", str(sid_pubkc_amount))
+    message4 = {"PM": str(PM), "signature": signature_sid_pubkc_amount}
+    message4_encrypted = functions.encrypt_asymmetric(str(message4).encode("utf8"), "PG")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sckTTP:
+        try:
+            sckTTP.connect(("127.0.0.2", 4321))
+        except Exception as e:
+            raise SystemExit(f"Eroare la conecatarea la server: {e}")
+        sckTTP.sendall(message4_encrypted)
+        msg = sckTTP.recv(4096)
+        if msg == b'ABORT':
+            client.sendall(b'ABORT')
 
     print(f"Clientul cu adresa ip: {ip}, si portul: {port}, a iesit!")
     client.close()

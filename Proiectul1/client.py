@@ -35,12 +35,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sck:
     PM = {"PI": PI, "PI_signature": PI_signature}
     PM = str(PM)
     PM_encrypted_by_KPG = functions.encrypt_asymmetric(PM.encode("utf8"), "PG")
+    # print("criptarea este", len(PM_encrypted_by_KPG.hex()), "\n", hex_key)
+    # print(bytes.fromhex(hex_key))
     OrderDesc = "Bicicleta, id=123"
     OI = {"OrderDesc": OrderDesc, "Sid": sid, "Amount": Amount}
     OI = str(OI)
     OI_signature = functions.signC(pub_k_c, OI)
     PO = {"OI": OI, "OI_signature": OI_signature}
-    message3 = {"PM": PM, "PO": PO}
+    message3 = {"PM": PM_encrypted_by_KPG.hex(), "PO": PO}
     message3 = str(message3)
     message3_encrypted = functions.encrypt_asymmetric(message3.encode("utf8"), "Merchant")
+    print(len(message3_encrypted), "lung mesaj")
     sck.sendall(message3_encrypted)
+    msg = sck.recv(3072)
+    if msg == b"ABORT":
+        print("Datele au fost alterate! Se anuleaza tranzactia!")
