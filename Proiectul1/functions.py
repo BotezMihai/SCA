@@ -63,7 +63,6 @@ def encrypt_asymmetric(data, key):
     try:
         cipher_text = cipher.encrypt(data)
     except (ValueError, TypeError) as e:
-        print("Am intrat in except pt. ca lungimea textului de criptat este prea mare, impart textul in chunk-uri si criptez ", e)
         for i in range(0, len(data), 470):
             cipher_text += cipher.encrypt(data[i:i + 470])
         return cipher_text
@@ -77,7 +76,6 @@ def decrypt_asymmetric(data, key):
     try:
         decrypted_message = decrypt.decrypt(data)
     except (ValueError, TypeError) as e:
-        print("Am intrat in except pt. ca lungimea textului de decriptat este prea mare, impart ciphertext-ul in chunk-uri si decriptez  ", e)
         for i in range(0, len(data), 512):
             decrypted_message += decrypt.decrypt(data[i:i + 512])
     return decrypted_message
@@ -94,9 +92,8 @@ def test():
 
 
 def encrypt_symmetric(data, key):
-    print(len(key))
     cipher = AES.new(key, AES.MODE_ECB)
-    msg = cipher.encrypt(pad(data, 24))
+    msg = cipher.encrypt(pad(data, 48))
     return msg
 
 

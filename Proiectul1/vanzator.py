@@ -27,6 +27,7 @@ def on_new_client(client, connection):
     print(f"S-a conectat un nou client cu adresa ip {ip}, si portul: {port}!")
 
     msg = client.recv(1024)
+    print(f"Mesajul pe care l-am primit: {msg}")
     pub_k_c_encrypted = msg
     pub_k_c = functions.decrypt_asymmetric(pub_k_c_encrypted, "Merchant")
     # mesajul 2
@@ -38,6 +39,7 @@ def on_new_client(client, connection):
     client.sendall(message2_encrypted)
 
     msg = client.recv(3072)
+    print(f"Mesajul pe care l-am primit: {msg}")
     print("Pregatim mesajul 4 sa-l trimitem\n")
     msg2_decrypted = functions.decrypt_asymmetric(msg, "Merchant").decode("utf8")
     json_data = ast.literal_eval(msg2_decrypted)
@@ -57,6 +59,7 @@ def on_new_client(client, connection):
     sid_pubkc_amount = {"sid": sid, "pubkc": pub_k_c, "amount": amount}
     signature_sid_pubkc_amount = functions.sign("Merchant", str(sid_pubkc_amount))
     message4 = {"PM": str(PM), "signature": signature_sid_pubkc_amount}
+
     message4_encrypted = functions.encrypt_asymmetric(str(message4).encode("utf8"), "PG")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sckTTP:
         try:
@@ -65,9 +68,13 @@ def on_new_client(client, connection):
             raise SystemExit(f"Eroare la conecatarea la server: {e}")
         sckTTP.sendall(message4_encrypted)
         msg = sckTTP.recv(4096)
+        print(f"Mesajul pe care l-am primit: {msg}")
         if msg == b'ABORT':
             client.sendall(b'ABORT')
-
+        msg5_decrypted = functions.decrypt_asymmetric(msg, "Merchant")
+        print("Pregatim mesajul 6")
+        msg6 = functions.encrypt_symmetric(msg5_decrypted, pub_k_c)
+        client.sendall(msg6)
     print(f"Clientul cu adresa ip: {ip}, si portul: {port}, a iesit!")
     client.close()
 

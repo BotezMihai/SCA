@@ -23,17 +23,14 @@ def on_new_client(client, connection):
     port = connection[1]
     print(f"S-a conectat un nou client cu adresa ip {ip}, si portul: {port}!")
     msg = client.recv(4096)
+    print(f"Mesajul pe care l-am primit: {msg}")
     msg4_decrypted = functions.decrypt_asymmetric(msg, "PG").decode("utf8")
-    # print(msg4_decrypted)
     json_msg4_decrypted = ast.literal_eval(msg4_decrypted)
-    # print(json_msg4_decrypted)
     pm = json_msg4_decrypted['PM']
     pm_ascii = bytes.fromhex(pm)
     pm_decrypted = functions.decrypt_asymmetric(pm_ascii, "PG")
     pm_decrypted_json = ast.literal_eval(pm_decrypted.decode("utf8"))
     pi = pm_decrypted_json['PI']
-    # print(pi['PubKC'])
-    print(type(pi))
     pi_signature = pm_decrypted_json['PI_signature']
     signature_decrypted = unpad(functions.decrypt_symmetric(pi_signature, pi['PubKC']), 24)
     pi_hash = hashlib.md5(str(pi).encode("utf8")).hexdigest()
@@ -42,8 +39,30 @@ def on_new_client(client, connection):
     else:
         print("nu sunt egale")
         client.sendall(b'ABORT')
-    
-    # print(pi_signature)
+    with open("PG\cc.txt") as fd:
+        text = fd.read()
+    card = pi['cardN']
+    ccode = pi['CCode']
+    if ccode != text:
+        client.sendall(b'ABORT')
+    else:
+        print("CCode este bun!")
+    sid = pi['Sid']
+    pub_k_c = pi['PubKC']
+    amount = pi['Amount']
+    sid_pubkc_amount = {"sid": sid.decode("utf8"), "pubkc": pub_k_c, "amount": amount}
+    signature_merchant = json_msg4_decrypted['signature']
+    if functions.verify("Merchant", str(sid_pubkc_amount), signature_merchant):
+        print("Semnatura digitala asupra sid, pubKC si amount e autentica")
+    else:
+        client.sendall(b'ABORT')
+    print("Pregatim mesajul 5 catre merchant")
+    resp = "ok"
+    message5_info = {"resp": resp, "sid": sid.decode("utf8"), "amount": amount, "NC": pi['NC']}
+    message5_info_signature = functions.sign("PG", str(message5_info))
+    message5 = {"resp": resp, "sid": sid.decode("utf8"), "signature": message5_info_signature.hex()}
+    message5_encrypted = functions.encrypt_asymmetric(str(message5).encode("utf8"), "Merchant")
+    client.sendall(message5_encrypted)
     print(f"Clientul cu adresa ip: {ip}, si portul: {port}, a iesit!")
     client.close()
 

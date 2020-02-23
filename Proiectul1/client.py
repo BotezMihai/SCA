@@ -2,6 +2,7 @@ import socket
 import functions
 import time
 from Crypto.Util.Padding import pad, unpad
+import ast
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sck:
     try:
@@ -13,6 +14,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sck:
     pub_k_c_encrypted = functions.encrypt_asymmetric(pub_k_c, "Merchant")
     sck.sendall(pub_k_c_encrypted)
     data = sck.recv(1024)
+    print(f"Mesajul pe care l-am primit: {data}")
     message2_decrypted = unpad(functions.decrypt_symmetric(data, pub_k_c), 24)
     sid = message2_decrypted[:4]
     signature = message2_decrypted[4:]
@@ -45,8 +47,17 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sck:
     message3 = {"PM": PM_encrypted_by_KPG.hex(), "PO": PO}
     message3 = str(message3)
     message3_encrypted = functions.encrypt_asymmetric(message3.encode("utf8"), "Merchant")
-    print(len(message3_encrypted), "lung mesaj")
     sck.sendall(message3_encrypted)
     msg = sck.recv(3072)
+    print(f"Mesajul pe care l-am primit: {msg}")
     if msg == b"ABORT":
         print("Datele au fost alterate! Se anuleaza tranzactia!")
+    msg_decrypted = unpad(functions.decrypt_symmetric(msg, pub_k_c), 48).decode("utf8")
+    msg_decrypted_json = ast.literal_eval(msg_decrypted)
+    signature = msg_decrypted_json['signature']
+    signature_ascii = bytes.fromhex(signature)
+    data_for_verify = {"resp": msg_decrypted_json['resp'], "sid": msg_decrypted_json['sid'], "amount": Amount, "NC": NC}
+    if functions.verify("PG", str(data_for_verify), signature_ascii):
+        print("Tranzactia s-a facut cu success!!!")
+    else:
+        print("Datele au fost alterate")
