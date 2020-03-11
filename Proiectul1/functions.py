@@ -92,6 +92,7 @@ def test():
 
 
 def encrypt_symmetric(data, key):
+    print(len(key))
     cipher = AES.new(key, AES.MODE_ECB)
     msg = cipher.encrypt(pad(data, 48))
     return msg
